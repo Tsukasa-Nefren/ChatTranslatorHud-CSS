@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<Version>1.0.0</Version>
+		<LangVersion>latest</LangVersion>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+		<ReferenceLibraryRoot Condition="'$(ReferenceLibraryRoot)' == '' And Exists('D:/AMPDatastore/Instances/cssharp01/counter-strike2/730/game/csgo/addons/counterstrikesharp/shared')">D:/AMPDatastore/Instances/cssharp01/counter-strike2/730/game/csgo/addons/counterstrikesharp/shared</ReferenceLibraryRoot>
+		<ReferenceLibraryRoot Condition="'$(ReferenceLibraryRoot)' == ''">$(MSBuildProjectDirectory)/lib</ReferenceLibraryRoot>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="CounterStrikeSharp.API" Version="1.0.369" ExcludeAssets="runtime" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Reference Include="PlayerSettingsApi">
+			<HintPath>$(ReferenceLibraryRoot)/PlayerSettingsApi/PlayerSettingsApi.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="CS2MenuManager">
+			<HintPath>$(ReferenceLibraryRoot)/CS2MenuManager/CS2MenuManager.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+	</ItemGroup>
+
+	<ItemGroup>
+		<Compile Remove="tests\**\*.cs" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="lang\**\*.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+		<None Include="runtimes\win-x64\native\ChatTranslatorHud.Native.dll" TargetPath="ChatTranslatorHud.Native.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('runtimes\win-x64\native\ChatTranslatorHud.Native.dll')" />
+	</ItemGroup>
+
+</Project>

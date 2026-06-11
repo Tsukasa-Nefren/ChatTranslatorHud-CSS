@@ -1,0 +1,13 @@
+﻿{
+    "chattranslatorhud.menu.title": "\uBC88\uC5ED \uC124\uC815",
+    "chattranslatorhud.menu.description": "\uBC88\uC5ED \uD45C\uC2DC \uC635\uC158",
+    "chattranslatorhud.menu.hud_display": "HUD \uD45C\uC2DC",
+    "chattranslatorhud.menu.original_message": "\uC6D0\uBCF8 \uBA54\uC2DC\uC9C0",
+    "chattranslatorhud.common.on": "\uCF1C\uC9D0",
+    "chattranslatorhud.common.off": "\uAEBC\uC9D0",
+    "chattranslatorhud.chat.hud_enabled": "\uBC88\uC5ED HUD\uAC00 \uD65C\uC131\uD654\uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
+    "chattranslatorhud.chat.hud_disabled": "\uBC88\uC5ED HUD\uAC00 \uBE44\uD65C\uC131\uD654\uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
+    "chattranslatorhud.chat.original_enabled": "\uC6D0\uBCF8 \uBA54\uC2DC\uC9C0\uAC00 \uD65C\uC131\uD654\uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
+    "chattranslatorhud.chat.original_disabled": "\uC6D0\uBCF8 \uBA54\uC2DC\uC9C0\uAC00 \uBE44\uD65C\uC131\uD654\uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
+    "chattranslatorhud.menu.exit": "\uB2EB\uAE30"
+}

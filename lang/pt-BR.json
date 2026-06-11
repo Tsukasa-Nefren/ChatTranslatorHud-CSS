@@ -1,0 +1,13 @@
+﻿{
+    "chattranslatorhud.menu.title":  "Translation Settings",
+    "chattranslatorhud.menu.description":  "Translation display options",
+    "chattranslatorhud.menu.hud_display":  "HUD Display",
+    "chattranslatorhud.menu.original_message":  "Original Message",
+    "chattranslatorhud.common.on":  "ON",
+    "chattranslatorhud.common.off":  "OFF",
+    "chattranslatorhud.chat.hud_enabled":  "Translation HUD enabled.",
+    "chattranslatorhud.chat.hud_disabled":  "Translation HUD disabled.",
+    "chattranslatorhud.chat.original_enabled":  "Original message enabled.",
+    "chattranslatorhud.chat.original_disabled":  "Original message disabled.",
+    "chattranslatorhud.menu.exit":  "Exit"
+}

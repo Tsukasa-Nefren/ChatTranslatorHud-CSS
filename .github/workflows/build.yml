@@ -1,0 +1,80 @@
+name: CI Build and Release
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract Version
+        id: version
+        run: |
+          VERSION=$(grep -oP '(?<=<Version>)[^<]+' ChatTranslatorHud.csproj)
+          echo "Extracted Version: $VERSION"
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Check Existing Release
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "Release v$VERSION already exists! Build will be skipped."
+            echo "SKIP_BUILD=true" >> $GITHUB_OUTPUT
+          else
+            echo "Release v$VERSION not found. Proceeding with build."
+            echo "SKIP_BUILD=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup .NET
+        if: steps.check.outputs.SKIP_BUILD == 'false' || github.event_name == 'pull_request'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build plugin
+        if: steps.check.outputs.SKIP_BUILD == 'false' || github.event_name == 'pull_request'
+        run: dotnet build ChatTranslatorHud.csproj -c Release
+
+      - name: Publish plugin
+        if: steps.check.outputs.SKIP_BUILD == 'false' || github.event_name == 'pull_request'
+        run: dotnet publish ChatTranslatorHud.csproj -c Release -o ./artifacts/ChatTranslatorHud
+
+      - name: Verify native DLL
+        if: steps.check.outputs.SKIP_BUILD == 'false' || github.event_name == 'pull_request'
+        run: |
+          if [ ! -f "./artifacts/ChatTranslatorHud/ChatTranslatorHud.Native.dll" ]; then
+            echo "ChatTranslatorHud.Native.dll is missing from publish output!"
+            exit 1
+          fi
+          echo "ChatTranslatorHud.Native.dll found."
+
+      - name: Package Release
+        if: steps.check.outputs.SKIP_BUILD == 'false' || github.event_name == 'pull_request'
+        run: |
+          cd artifacts
+          zip -r ChatTranslatorHud-v${{ steps.version.outputs.VERSION }}.zip ChatTranslatorHud/
+
+      - name: Create GitHub Release
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && steps.check.outputs.SKIP_BUILD == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          gh release create "v$VERSION" \
+            ./artifacts/ChatTranslatorHud-v$VERSION.zip \
+            --title "v$VERSION" \
+            --generate-notes

@@ -1,0 +1,13 @@
+{
+    "chattranslatorhud.menu.title":  "Pengaturan Terjemahan",
+    "chattranslatorhud.menu.description":  "Opsi tampilan terjemahan",
+    "chattranslatorhud.menu.hud_display":  "Tampilan HUD",
+    "chattranslatorhud.menu.original_message":  "Pesan Asli",
+    "chattranslatorhud.common.on":  "AKTIF",
+    "chattranslatorhud.common.off":  "NONAKTIF",
+    "chattranslatorhud.chat.hud_enabled":  "HUD terjemahan diaktifkan.",
+    "chattranslatorhud.chat.hud_disabled":  "HUD terjemahan dinonaktifkan.",
+    "chattranslatorhud.chat.original_enabled":  "Pesan asli diaktifkan.",
+    "chattranslatorhud.chat.original_disabled":  "Pesan asli dinonaktifkan.",
+    "chattranslatorhud.menu.exit":  "Keluar"
+}
