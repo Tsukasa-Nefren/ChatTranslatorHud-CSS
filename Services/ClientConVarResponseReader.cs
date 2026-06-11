@@ -218,17 +218,26 @@ public static class ClientConVarResponseReader
             }
         }
 
+        private static string GetNativeLibraryName()
+        {
+            return RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                ? "ChatTranslatorHud.Native.dll"
+                : "ChatTranslatorHud.Native.so";
+        }
+
         private static IEnumerable<string> GetCandidatePaths(string? configuredDirectory)
         {
+            var fileName = GetNativeLibraryName();
+
             if (!string.IsNullOrWhiteSpace(configuredDirectory))
-                yield return Path.Combine(configuredDirectory, "ChatTranslatorHud.Native.dll");
+                yield return Path.Combine(configuredDirectory, fileName);
 
             var assemblyDirectory = Path.GetDirectoryName(typeof(ClientConVarResponseReader).Assembly.Location);
             if (!string.IsNullOrWhiteSpace(assemblyDirectory))
-                yield return Path.Combine(assemblyDirectory, "ChatTranslatorHud.Native.dll");
+                yield return Path.Combine(assemblyDirectory, fileName);
 
             if (!string.IsNullOrWhiteSpace(AppContext.BaseDirectory))
-                yield return Path.Combine(AppContext.BaseDirectory, "ChatTranslatorHud.Native.dll");
+                yield return Path.Combine(AppContext.BaseDirectory, fileName);
         }
 
         public int Version()

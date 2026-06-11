@@ -12,6 +12,12 @@
 #include "dynohook/hook.h"
 #include "netmessages.pb.h"
 
+#if defined(_WIN32)
+#define NATIVE_EXPORT extern "C" __declspec(dllexport)
+#else
+#define NATIVE_EXPORT extern "C" __attribute__((visibility("default")))
+#endif
+
 class INetworkMessageInternal;
 
 template <typename PROTO_TYPE>
@@ -75,17 +81,17 @@ static int32_t CopyString(char* destination, size_t destinationSize, const std::
     return static_cast<int32_t>(length);
 }
 
-extern "C" __declspec(dllexport) int ChatTranslatorHud_NativeVersion()
+NATIVE_EXPORT int ChatTranslatorHud_NativeVersion()
 {
     return 4;
 }
 
-extern "C" __declspec(dllexport) void* ChatTranslatorHud_AsProto(const CNetMessage* message)
+NATIVE_EXPORT void* ChatTranslatorHud_AsProto(const CNetMessage* message)
 {
     return message == nullptr ? nullptr : message->AsProto();
 }
 
-extern "C" __declspec(dllexport) bool ChatTranslatorHud_ReadRespondCvarValue(
+NATIVE_EXPORT bool ChatTranslatorHud_ReadRespondCvarValue(
     const CNetMessage* message,
     const int32_t* expectedCookies,
     int32_t expectedCookieCount,
@@ -126,7 +132,7 @@ extern "C" __declspec(dllexport) bool ChatTranslatorHud_ReadRespondCvarValue(
     return response->cookie != 0 && response->name_length > 0;
 }
 
-extern "C" __declspec(dllexport) bool ChatTranslatorHud_ReadRespondCvarValueFromHook(
+NATIVE_EXPORT bool ChatTranslatorHud_ReadRespondCvarValueFromHook(
     const dyno::Hook* hook,
     const int32_t* expectedCookies,
     int32_t expectedCookieCount,

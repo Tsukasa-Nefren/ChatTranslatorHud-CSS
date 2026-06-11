@@ -33,6 +33,7 @@
 	<ItemGroup>
 		<None Include="lang\**\*.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
 		<None Include="runtimes\win-x64\native\ChatTranslatorHud.Native.dll" TargetPath="ChatTranslatorHud.Native.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('runtimes\win-x64\native\ChatTranslatorHud.Native.dll')" />
+		<None Include="runtimes\linux-x64\native\ChatTranslatorHud.Native.so" TargetPath="ChatTranslatorHud.Native.so" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('runtimes\linux-x64\native\ChatTranslatorHud.Native.so')" />
 	</ItemGroup>
 
 </Project>
