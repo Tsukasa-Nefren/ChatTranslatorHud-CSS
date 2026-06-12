@@ -57,7 +57,7 @@ public static class ClientConVarResponseReader
             try
             {
                 loadedBridge = NativeBridge.Load(_nativeBridgeDirectory);
-                if (loadedBridge.Version() < 4)
+                if (loadedBridge.Version() < 7)
                     throw new InvalidOperationException("ChatTranslatorHud.Native returned an unsupported version.");
 
                 _nativeBridge = loadedBridge;
@@ -65,7 +65,6 @@ public static class ClientConVarResponseReader
             }
             catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException or InvalidOperationException)
             {
-                // If we loaded the DLL but version check failed, free it
                 if (loadedBridge != null && _nativeBridge != loadedBridge)
                     loadedBridge.Dispose();
 
@@ -77,54 +76,18 @@ public static class ClientConVarResponseReader
         }
     }
 
-    public static bool TryRead(IntPtr cNetMessage, IEnumerable<int> expectedCookies, out ClientConVarResponse response)
+    public static int InitHook(IntPtr targetFunction)
     {
-        response = default;
-
-        if (cNetMessage == IntPtr.Zero)
-            return false;
-
-        NativeBridge? bridge;
         lock (_bridgeLock)
         {
-            if (_disposed || _nativeBridge == null)
-                return false;
-            bridge = _nativeBridge;
+            if (_disposed || _nativeBridge == null) return -1;
+            return _nativeBridge.InitHook(targetFunction);
         }
-
-        if (!IsNativeBridgeAvailable(out _))
-            return false;
-
-        var cookies = expectedCookies as int[] ?? expectedCookies.ToArray();
-        if (cookies.Length == 0)
-            return false;
-
-        var nativeResponse = NativeConVarResponse.Create();
-        if (!bridge.ReadRespondCvarValue(cNetMessage, cookies, cookies.Length, ref nativeResponse))
-            return false;
-
-        if (nativeResponse.StatusCode is < 0 or > 3)
-            return false;
-
-        var name = ReadUtf8(nativeResponse.Name, nativeResponse.NameLength);
-        if (string.IsNullOrWhiteSpace(name))
-            return false;
-
-        response = new ClientConVarResponse(
-            nativeResponse.Cookie,
-            nativeResponse.StatusCode,
-            name,
-            ReadUtf8(nativeResponse.Value, nativeResponse.ValueLength));
-
-        return true;
     }
 
-    public static bool TryReadFromHook(IntPtr hook, IEnumerable<int> expectedCookies, out ClientConVarResponse response)
+    public static bool TryPopResponse(out ClientConVarResponse response)
     {
         response = default;
-
-        if (hook == IntPtr.Zero)
-            return false;
 
         NativeBridge? bridge;
         lock (_bridgeLock)
@@ -137,12 +100,8 @@ public static class ClientConVarResponseReader
         if (!IsNativeBridgeAvailable(out _))
             return false;
 
-        var cookies = expectedCookies as int[] ?? expectedCookies.ToArray();
-        if (cookies.Length == 0)
-            return false;
-
         var nativeResponse = NativeConVarResponse.Create();
-        if (!bridge.ReadRespondCvarValueFromHook(hook, cookies, cookies.Length, ref nativeResponse))
+        if (!bridge.PopResponse(ref nativeResponse))
             return false;
 
         if (nativeResponse.StatusCode is < 0 or > 3)
@@ -174,8 +133,8 @@ public static class ClientConVarResponseReader
     private sealed class NativeBridge : IDisposable
     {
         private readonly NativeVersionDelegate _version;
-        private readonly ReadRespondCvarValueDelegate _readRespondCvarValue;
-        private readonly ReadRespondCvarValueFromHookDelegate _readRespondCvarValueFromHook;
+        private readonly InitHookDelegate _initHook;
+        private readonly PopResponseDelegate _popResponse;
         private IntPtr _handle;
 
         private NativeBridge(IntPtr handle)
@@ -183,10 +142,10 @@ public static class ClientConVarResponseReader
             _handle = handle;
             _version = Marshal.GetDelegateForFunctionPointer<NativeVersionDelegate>(
                 NativeLibrary.GetExport(handle, "ChatTranslatorHud_NativeVersion"));
-            _readRespondCvarValue = Marshal.GetDelegateForFunctionPointer<ReadRespondCvarValueDelegate>(
-                NativeLibrary.GetExport(handle, "ChatTranslatorHud_ReadRespondCvarValue"));
-            _readRespondCvarValueFromHook = Marshal.GetDelegateForFunctionPointer<ReadRespondCvarValueFromHookDelegate>(
-                NativeLibrary.GetExport(handle, "ChatTranslatorHud_ReadRespondCvarValueFromHook"));
+            _initHook = Marshal.GetDelegateForFunctionPointer<InitHookDelegate>(
+                NativeLibrary.GetExport(handle, "ChatTranslatorHud_InitHook"));
+            _popResponse = Marshal.GetDelegateForFunctionPointer<PopResponseDelegate>(
+                NativeLibrary.GetExport(handle, "ChatTranslatorHud_PopResponse"));
         }
 
         public void Dispose()
@@ -245,42 +204,25 @@ public static class ClientConVarResponseReader
             return _version();
         }
 
-        public bool ReadRespondCvarValue(
-            IntPtr cNetMessage,
-            int[] expectedCookies,
-            int expectedCookieCount,
-            ref NativeConVarResponse response)
+        public int InitHook(IntPtr targetFunction)
         {
-            return _readRespondCvarValue(cNetMessage, expectedCookies, expectedCookieCount, ref response);
+            return _initHook(targetFunction);
         }
 
-        public bool ReadRespondCvarValueFromHook(
-            IntPtr hook,
-            int[] expectedCookies,
-            int expectedCookieCount,
-            ref NativeConVarResponse response)
+        public bool PopResponse(ref NativeConVarResponse response)
         {
-            return _readRespondCvarValueFromHook(hook, expectedCookies, expectedCookieCount, ref response);
+            return _popResponse(ref response);
         }
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private delegate int NativeVersionDelegate();
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        [return: MarshalAs(UnmanagedType.I1)]
-        private delegate bool ReadRespondCvarValueDelegate(
-            IntPtr cNetMessage,
-            [MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 2)] int[] expectedCookies,
-            int expectedCookieCount,
-            ref NativeConVarResponse response);
+        private delegate int InitHookDelegate(IntPtr targetFunction);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.I1)]
-        private delegate bool ReadRespondCvarValueFromHookDelegate(
-            IntPtr hook,
-            [MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 2)] int[] expectedCookies,
-            int expectedCookieCount,
-            ref NativeConVarResponse response);
+        private delegate bool PopResponseDelegate(ref NativeConVarResponse response);
     }
 
     [StructLayout(LayoutKind.Sequential)]

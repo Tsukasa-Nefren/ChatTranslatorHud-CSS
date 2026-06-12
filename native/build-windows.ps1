@@ -52,31 +52,10 @@ $env:INCLUDE = @(
     (Join-Path $sdkInclude "shared")
 ) -join ";"
 
-$protoInclude = Select-ExistingPath @(
-    (Join-Path $root "..\..\modsharp-public-master\Engine\src\proto")
-) "ModSharp generated protobuf include directory"
-
-$protobufInclude = Select-ExistingPath @(
-    (Join-Path $root "..\CounterStrikeSharp\libraries\hl2sdk-cs2\thirdparty\protobuf-3.21.8\src"),
-    (Join-Path $root "..\..\_tmp\CounterStrikeSharp\libraries\hl2sdk-cs2\thirdparty\protobuf-3.21.8\src")
-) "protobuf include directory"
-
-$protobufLib = Select-ExistingPath @(
-    (Join-Path $root "..\CounterStrikeSharp\libraries\hl2sdk-cs2\lib\public\win64\2015"),
-    (Join-Path $root "..\..\_tmp\CounterStrikeSharp\libraries\hl2sdk-cs2\lib\public\win64\2015"),
-    (Join-Path $root "..\..\modsharp-public-master\Engine\lib")
-) "protobuf library directory"
-
-$dynoHookInclude = Select-ExistingPath @(
-    (Join-Path $root "..\CounterStrikeSharp\libraries\DynoHook\src"),
-    (Join-Path $root "..\..\_tmp\CounterStrikeSharp\libraries\DynoHook\src")
-) "DynoHook include directory"
-
 $env:LIB = @(
     $lib,
     (Join-Path $sdkLib "ucrt\x64"),
-    (Join-Path $sdkLib "um\x64"),
-    $protobufLib
+    (Join-Path $sdkLib "um\x64")
 ) -join ";"
 
 $clArgs = @(
@@ -85,14 +64,14 @@ $clArgs = @(
     "/O2",
     "/EHsc",
     "/std:c++20",
-    "/I$protoInclude",
-    "/I$protobufInclude",
-    "/I$dynoHookInclude",
     (Join-Path $PSScriptRoot "ChatTranslatorHud.Native.cpp"),
-    "/Fo:$(Join-Path $outDir "ChatTranslatorHud.Native.obj")",
-    "/Fe:$(Join-Path $outDir "ChatTranslatorHud.Native.dll")",
-    "/link",
-    "libprotobuf.lib"
+    (Join-Path $PSScriptRoot "buffer.c"),
+    (Join-Path $PSScriptRoot "hook.c"),
+    (Join-Path $PSScriptRoot "trampoline.c"),
+    (Join-Path $PSScriptRoot "hde32.c"),
+    (Join-Path $PSScriptRoot "hde64.c"),
+    "/Fo:$(Join-Path $outDir "\")",
+    "/Fe:$(Join-Path $outDir "ChatTranslatorHud.Native.dll")"
 )
 
 & $cl.FullName @clArgs | Write-Output

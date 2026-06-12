@@ -2,10 +2,10 @@ using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Memory;
-using CounterStrikeSharp.API.Modules.Memory.DynamicFunctions;
 using CounterStrikeSharp.API.Modules.UserMessages;
 using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Logging;
+using CounterStrikeSharp.API.Modules.Timers;
 
 namespace ChatTranslatorHud.Services;
 
@@ -24,7 +24,7 @@ internal sealed record ClientConVarQueryResult(
     string Name,
     string Value);
 
-internal sealed class ClientConVarQueryService(ChatTranslatorHud plugin, ILogger logger, bool useNativeResponseHook)
+internal sealed class ClientConVarQueryService
 {
     private const string RequestMessageName = "GetCvarValue";
     private const string ResponseMessageName = "RespondCvarValue";
@@ -32,18 +32,28 @@ internal sealed class ClientConVarQueryService(ChatTranslatorHud plugin, ILogger
     private const int RespondCvarValueWindowsVtableIndex = 38;
     private const int RespondCvarValueLinuxVtableIndex = 40;
 
+    private readonly ChatTranslatorHud _plugin;
+    private readonly ILogger _logger;
+    private readonly bool _useNativeResponseHook;
     private readonly Dictionary<int, PendingClientConVarQuery> _pendingQueries = [];
     private readonly object _pendingQueriesLock = new();
     private int _nextCookie;
     private int _responseMessageId = -1;
     private bool _responseHookRegistered;
     private bool _responseHookUnavailableLogged;
-    private VirtualFunctionWithReturn<IntPtr, IntPtr, bool>? _nativeResponseFunction;
     private bool _nativeResponseHookRegistered;
     private bool _nativeResponseHookUnavailableLogged;
     private bool _requestMessageInfoLogged;
     private bool _responseObservedLogged;
     private bool _responseTimeoutGuidanceLogged;
+    private CounterStrikeSharp.API.Modules.Timers.Timer? _pollTimer;
+
+    public ClientConVarQueryService(ChatTranslatorHud plugin, ILogger logger, bool useNativeResponseHook)
+    {
+        _plugin = plugin;
+        _logger = logger;
+        _useNativeResponseHook = useNativeResponseHook;
+    }
 
     public bool Query(CCSPlayerController player, ulong steamId64, string name, Action<ClientConVarQueryResult> callback)
     {
@@ -82,7 +92,7 @@ internal sealed class ClientConVarQueryService(ChatTranslatorHud plugin, ILogger
                 _pendingQueries.Remove(cookie);
             }
 
-            logger.LogWarning(ex, "Failed to query client convar {ConVar} for player {SteamId64}", name, steamId64);
+            _logger.LogWarning(ex, "Failed to query client convar {ConVar} for player {SteamId64}", name, steamId64);
             return false;
         }
     }
@@ -94,16 +104,16 @@ internal sealed class ClientConVarQueryService(ChatTranslatorHud plugin, ILogger
             _pendingQueries.Clear();
         }
 
-        if (_nativeResponseHookRegistered && _nativeResponseFunction != null)
+        if (_nativeResponseHookRegistered)
         {
-            _nativeResponseFunction.Unhook(OnNativeRespondCvarValue, HookMode.Pre);
-            _nativeResponseFunction = null;
+            _pollTimer?.Kill();
+            _pollTimer = null;
             _nativeResponseHookRegistered = false;
         }
 
         if (_responseHookRegistered && _responseMessageId >= 0)
         {
-            plugin.UnhookUserMessage(_responseMessageId, OnRespondCvarValue, HookMode.Pre);
+            _plugin.UnhookUserMessage(_responseMessageId, OnRespondCvarValue, HookMode.Pre);
             _responseHookRegistered = false;
             _responseMessageId = -1;
         }
@@ -114,29 +124,19 @@ internal sealed class ClientConVarQueryService(ChatTranslatorHud plugin, ILogger
         return HandleRespondCvarValue(message, "CSSSharp UserMessage hook");
     }
 
-    private HookResult OnNativeRespondCvarValue(DynamicHook hook)
+    private void PollNativeQueue()
     {
-        int[] pendingCookies;
-        lock (_pendingQueriesLock)
-        {
-            pendingCookies = _pendingQueries.Keys.ToArray();
-        }
-
-        if (!ClientConVarResponseReader.TryReadFromHook(hook.Handle, pendingCookies, out var response))
-            return HookResult.Continue;
-
-        Server.NextFrame(() =>
+        while (ClientConVarResponseReader.TryPopResponse(out var response))
         {
             try
             {
-                HandleRespondCvarValue(response, "CServerSideClient vtable hook");
+                HandleRespondCvarValue(response, "Native Bridge Hook");
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error handling CServerSideClient vtable hook response");
+                _logger.LogError(ex, "Error handling native bridge hook response");
             }
-        });
-        return HookResult.Continue;
+        }
     }
 
     private HookResult HandleRespondCvarValue(UserMessage message, string hookSource)
@@ -179,7 +179,7 @@ internal sealed class ClientConVarQueryService(ChatTranslatorHud plugin, ILogger
 
         if (!_responseObservedLogged)
         {
-            logger.LogInformation("Observed client convar response via {HookSource}: {ResponseMessageName}", hookSource, ResponseMessageName);
+            _logger.LogInformation("Observed client convar response via {HookSource}: {ResponseMessageName}", hookSource, ResponseMessageName);
             _responseObservedLogged = true;
         }
 
@@ -189,7 +189,7 @@ internal sealed class ClientConVarQueryService(ChatTranslatorHud plugin, ILogger
 
     private bool TryEnsureResponseHook()
     {
-        if (useNativeResponseHook && TryEnsureNativeResponseHook())
+        if (_useNativeResponseHook && TryEnsureNativeResponseHook())
             return true;
 
         if (_responseHookRegistered)
@@ -198,18 +198,18 @@ internal sealed class ClientConVarQueryService(ChatTranslatorHud plugin, ILogger
         try
         {
             _responseMessageId = UserMessage.FindIdByName(ResponseMessageName);
-            plugin.HookUserMessage(_responseMessageId, OnRespondCvarValue, HookMode.Pre);
+            _plugin.HookUserMessage(_responseMessageId, OnRespondCvarValue, HookMode.Pre);
             _responseHookRegistered = true;
 
             using var responseMessage = UserMessage.FromId(_responseMessageId);
-            logger.LogInformation("Registered client convar response hook for {MessageName} ({MessageId}, type {MessageType})", responseMessage.Name, responseMessage.Id, responseMessage.Type);
+            _logger.LogInformation("Registered client convar response hook for {MessageName} ({MessageId}, type {MessageType})", responseMessage.Name, responseMessage.Id, responseMessage.Type);
             return true;
         }
         catch (Exception ex)
         {
             if (!_responseHookUnavailableLogged)
             {
-                logger.LogWarning(ex, "Failed to register client convar response hook for {MessageName}", ResponseMessageName);
+                _logger.LogWarning(ex, "Failed to register client convar response hook for {MessageName}", ResponseMessageName);
                 _responseHookUnavailableLogged = true;
             }
 
@@ -233,23 +233,32 @@ internal sealed class ClientConVarQueryService(ChatTranslatorHud plugin, ILogger
             }
 
             var vtableIndex = GetRespondCvarValueVtableIndex();
-            _responseMessageId = UserMessage.FindIdByName(ResponseMessageName);
-            _nativeResponseFunction = new VirtualFunctionWithReturn<IntPtr, IntPtr, bool>("CServerSideClient", Addresses.EnginePath, vtableIndex);
-            _nativeResponseFunction.Hook(OnNativeRespondCvarValue, HookMode.Pre);
+            IntPtr vtable = NativeAPI.FindVirtualTable(Addresses.EnginePath, "CServerSideClient");
+            if (vtable == IntPtr.Zero)
+                throw new InvalidOperationException("Failed to find CServerSideClient vtable.");
+
+            IntPtr targetFunc = Marshal.ReadIntPtr(vtable + (vtableIndex * 8));
+            if (targetFunc == IntPtr.Zero)
+                throw new InvalidOperationException("Failed to read ProcessRespondCvarValue function pointer from vtable.");
+
+            int initResult = ClientConVarResponseReader.InitHook(targetFunc);
+            if (initResult != 0 && initResult != -2) // -2 is ALREADY_INITIALIZED, which is fine on reload
+                throw new InvalidOperationException($"ChatTranslatorHud.Native InitHook returned {initResult}. (MinHook failed)");
+
+            _pollTimer = _plugin.AddTimer(0.1f, PollNativeQueue, TimerFlags.REPEAT);
             _nativeResponseHookRegistered = true;
 
-            logger.LogInformation("Registered client convar native response hook for CServerSideClient::CLCMsg_RespondCvarValue at vtable index {VtableIndex} in {EnginePath}", vtableIndex, Addresses.EnginePath);
+            _logger.LogInformation("Registered client convar native MinHook for CServerSideClient::CLCMsg_RespondCvarValue at vtable index {VtableIndex} in {EnginePath} (Pointer: {Ptr})", vtableIndex, Addresses.EnginePath, targetFunc.ToString("X"));
             return true;
         }
         catch (Exception ex)
         {
             if (!_nativeResponseHookUnavailableLogged)
             {
-                logger.LogWarning(ex, "Failed to register native CServerSideClient::CLCMsg_RespondCvarValue hook; falling back to CSSSharp UserMessage hook");
+                _logger.LogWarning(ex, "Failed to register native CServerSideClient::CLCMsg_RespondCvarValue hook; falling back to CSSSharp UserMessage hook");
                 _nativeResponseHookUnavailableLogged = true;
             }
 
-            _nativeResponseFunction = null;
             _nativeResponseHookRegistered = false;
             return false;
         }
@@ -276,11 +285,11 @@ internal sealed class ClientConVarQueryService(ChatTranslatorHud plugin, ILogger
         {
             var query = pair.Value;
 
-            logger.LogDebug("Client convar query {ConVar} timed out for player {SteamId64} in slot {PlayerSlot}", query.Name, query.SteamId64, query.PlayerSlot);
+            _logger.LogDebug("Client convar query {ConVar} timed out for player {SteamId64} in slot {PlayerSlot}", query.Name, query.SteamId64, query.PlayerSlot);
 
             if (!_responseTimeoutGuidanceLogged)
             {
-                logger.LogWarning("Client convar query timed out without {ResponseMessageName}; the active response hook did not receive or match inbound CLCMsg_RespondCvarValue.", ResponseMessageName);
+                _logger.LogWarning("Client convar query timed out without {ResponseMessageName}; the active response hook did not receive or match inbound CLCMsg_RespondCvarValue.", ResponseMessageName);
                 _responseTimeoutGuidanceLogged = true;
             }
         }
@@ -291,7 +300,7 @@ internal sealed class ClientConVarQueryService(ChatTranslatorHud plugin, ILogger
         if (_requestMessageInfoLogged)
             return;
 
-        logger.LogInformation("Prepared client convar request message {MessageName} ({MessageId}, type {MessageType})", message.Name, message.Id, message.Type);
+        _logger.LogInformation("Prepared client convar request message {MessageName} ({MessageId}, type {MessageType})", message.Name, message.Id, message.Type);
         _requestMessageInfoLogged = true;
     }
 
