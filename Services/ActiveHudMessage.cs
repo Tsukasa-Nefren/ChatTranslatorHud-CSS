@@ -76,18 +76,14 @@ public sealed class ActiveHudMessage
         if (language is not null &&
             PerLanguageTemplates.TryGetValue(language.ToUpperInvariant(), out var languageTemplate))
         {
-            return $"{languageTemplate.Prefix}{seconds}{languageTemplate.Suffix}";
+            var secondsText = seconds.ToString();
+            return CountdownMessageFormatter.FormatWithDecoration(
+                languageTemplate.Prefix,
+                secondsText,
+                languageTemplate.Suffix);
         }
 
-        if (IsMmss)
-        {
-            var minutes = seconds / 60;
-            var remainingSeconds = seconds % 60;
-            return $"{Prefix}{minutes:00}:{remainingSeconds:00}{Suffix}";
-        }
-
-        var middle = string.IsNullOrEmpty(Unit) ? $"{seconds}" : $"{seconds} {Unit}";
-        return $"{Prefix}{middle}{Suffix}";
+        return CountdownMessageFormatter.FormatCountdownText(Prefix, seconds, Suffix, IsMmss, Unit);
     }
 
     private int GetRemainingSeconds(DateTimeOffset now)

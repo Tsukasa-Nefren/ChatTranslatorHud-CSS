@@ -96,10 +96,15 @@ internal sealed class GameEventListener(
         }
     }
 
-    private async Task ProcessCountdownMessageAsync(string message, ParseResult parseResult, List<PlayerRecipient> recipients)
+    private async Task ProcessCountdownMessageAsync(
+        string message,
+        ParseResult parseResult,
+        List<PlayerRecipient> recipients)
     {
         var languageGroups = BuildLanguageGroups(recipients);
-        var translations = languageGroups.Count > 0
+        var shouldTranslate = CountdownMessageFormatter.ShouldTranslate(parseResult);
+        var chatMessage = CountdownMessageFormatter.FormatForConsoleChat(parseResult, message);
+        var translations = shouldTranslate && languageGroups.Count > 0
             ? await TranslateForLanguagesAsync(message, languageGroups.Keys)
             : new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
 
@@ -109,13 +114,22 @@ internal sealed class GameEventListener(
         var templates = BuildCountdownTemplates(parseResult, translations);
         await Server.NextWorldUpdateAsync(() =>
         {
-            SendTranslatedChatMessages(message, languageGroups, translations);
-            SendFallbackOriginalToUngrouped(message, recipients, languageGroups);
+            SendTranslatedChatMessages(chatMessage, languageGroups, translations);
+            SendFallbackOriginalToUngrouped(chatMessage, recipients, languageGroups);
 
             if (parseResult.Seconds > 5)
             {
-                var defaultTranslation = translations.Values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? message;
-                hudDisplayService.AddStaticMessage(defaultTranslation, message, DateTimeOffset.UtcNow);
+                var defaultTranslation = translations.Values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? chatMessage;
+                var staticHudText = CountdownMessageFormatter.FormatForStaticHud(parseResult, defaultTranslation);
+                var staticHudOriginalText = shouldTranslate ? message : "";
+                logger.LogInformation(
+                    "Countdown HUD static: raw='{RawMessage}', chat='{ChatMessage}', hud='{HudMessage}', seconds={Seconds}, translate={Translate}",
+                    message,
+                    chatMessage,
+                    staticHudText,
+                    parseResult.Seconds,
+                    shouldTranslate);
+                hudDisplayService.AddStaticMessage(staticHudText, staticHudOriginalText, DateTimeOffset.UtcNow);
             }
 
             hudDisplayService.AddCountdown(parseResult, message, DateTimeOffset.UtcNow, templates);
