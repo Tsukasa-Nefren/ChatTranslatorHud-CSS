@@ -7,3 +7,5 @@ TestResults/
 artifacts/
 publish/
 publish-check/
+*.obj
+native/test_*.cpp

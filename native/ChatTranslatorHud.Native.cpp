@@ -213,7 +213,8 @@ NATIVE_EXPORT int ChatTranslatorHud_InitHook(void* targetFunction)
     if (targetFunction == nullptr) return -1;
     g_pTargetFunction = targetFunction;
 
-    if (MH_Initialize() != MH_OK && MH_Initialize() != MH_ERROR_ALREADY_INITIALIZED)
+    MH_STATUS initializeStatus = MH_Initialize();
+    if (initializeStatus != MH_OK && initializeStatus != MH_ERROR_ALREADY_INITIALIZED)
         return -2;
 
     if (MH_CreateHook(targetFunction, (LPVOID)&Detour_ProcessRespondCvarValue, reinterpret_cast<LPVOID*>(&g_pOriginal_ProcessRespondCvarValue)) != MH_OK)

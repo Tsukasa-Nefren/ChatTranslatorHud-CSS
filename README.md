@@ -37,6 +37,7 @@ addons/
         ChatTranslatorHud.dll
         ChatTranslatorHud.deps.json
         ChatTranslatorHud.Native.dll
+        ChatTranslatorHud.Native.so
         lang/
 ```
 
@@ -70,7 +71,7 @@ addons/counterstrikesharp/configs/plugins/ChatTranslatorHud/ChatTranslatorHud.js
 ## Notes
 
 - This is the CounterStrikeSharp port of the previous ModSharp ChatTranslatorHud.
-- `UseNativeClientConVarHook` enables the C# vtable hook used to receive `cl_language` query responses. Set it to `false` to fall back to CSSSharp's UserMessage hook path.
+- `UseNativeClientConVarHook` enables the native vtable hook used to receive `cl_language` query responses. Set it to `false` to fall back to CSSSharp's UserMessage hook path.
 - Player preferences are stored through PlayerSettingsApi.
 - Translation cache files are stored in `translation_cache` inside the plugin directory.
 

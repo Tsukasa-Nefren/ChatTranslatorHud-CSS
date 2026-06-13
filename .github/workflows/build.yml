@@ -27,6 +27,7 @@ jobs:
 
       - name: Check Existing Release
         id: check
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -40,30 +41,30 @@ jobs:
           fi
 
       - name: Setup .NET
-        if: steps.check.outputs.SKIP_BUILD == 'false' || github.event_name == 'pull_request'
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
 
       - name: Build plugin
-        if: steps.check.outputs.SKIP_BUILD == 'false' || github.event_name == 'pull_request'
         run: dotnet build ChatTranslatorHud.csproj -c Release
 
       - name: Publish plugin
-        if: steps.check.outputs.SKIP_BUILD == 'false' || github.event_name == 'pull_request'
         run: dotnet publish ChatTranslatorHud.csproj -c Release -o ./artifacts/ChatTranslatorHud
 
-      - name: Verify native DLL
-        if: steps.check.outputs.SKIP_BUILD == 'false' || github.event_name == 'pull_request'
+      - name: Verify native libraries
         run: |
           if [ ! -f "./artifacts/ChatTranslatorHud/ChatTranslatorHud.Native.dll" ]; then
             echo "ChatTranslatorHud.Native.dll is missing from publish output!"
             exit 1
           fi
-          echo "ChatTranslatorHud.Native.dll found."
+          if [ ! -f "./artifacts/ChatTranslatorHud/ChatTranslatorHud.Native.so" ]; then
+            echo "ChatTranslatorHud.Native.so is missing from publish output!"
+            exit 1
+          fi
+          echo "Native libraries found."
 
       - name: Package Release
-        if: steps.check.outputs.SKIP_BUILD == 'false' || github.event_name == 'pull_request'
+        if: steps.check.outputs.SKIP_BUILD != 'true' || github.event_name == 'pull_request'
         run: |
           cd artifacts
           zip -r ChatTranslatorHud-v${{ steps.version.outputs.VERSION }}.zip ChatTranslatorHud/

@@ -76,12 +76,12 @@ public static class ClientConVarResponseReader
         }
     }
 
-    public static int InitHook(IntPtr targetFunction)
+    public static int InitHook(IntPtr targetFunction, IntPtr vtable, int vtableIndex)
     {
         lock (_bridgeLock)
         {
             if (_disposed || _nativeBridge == null) return -1;
-            return _nativeBridge.InitHook(targetFunction);
+            return _nativeBridge.InitHook(targetFunction, vtable, vtableIndex);
         }
     }
 
@@ -153,6 +153,7 @@ public static class ClientConVarResponseReader
     {
         private readonly NativeVersionDelegate _version;
         private readonly InitHookDelegate _initHook;
+        private readonly InitHookVTableDelegate? _initHookVTable;
         private readonly PopResponseDelegate _popResponse;
         private readonly ShutdownHookDelegate? _shutdownHook;
         private readonly HasResponseDelegate? _hasResponse;
@@ -170,6 +171,9 @@ public static class ClientConVarResponseReader
                 NativeLibrary.GetExport(handle, "ChatTranslatorHud_InitHook"));
             _popResponse = Marshal.GetDelegateForFunctionPointer<PopResponseDelegate>(
                 NativeLibrary.GetExport(handle, "ChatTranslatorHud_PopResponse"));
+
+            if (NativeLibrary.TryGetExport(handle, "ChatTranslatorHud_InitHookVTable", out var initHookVTableAddress))
+                _initHookVTable = Marshal.GetDelegateForFunctionPointer<InitHookVTableDelegate>(initHookVTableAddress);
 
             if (NativeLibrary.TryGetExport(handle, "ChatTranslatorHud_ShutdownHook", out var shutdownHookAddress))
                 _shutdownHook = Marshal.GetDelegateForFunctionPointer<ShutdownHookDelegate>(shutdownHookAddress);
@@ -253,8 +257,11 @@ public static class ClientConVarResponseReader
             return _version();
         }
 
-        public int InitHook(IntPtr targetFunction)
+        public int InitHook(IntPtr targetFunction, IntPtr vtable, int vtableIndex)
         {
+            if (_initHookVTable != null && vtable != IntPtr.Zero && vtableIndex >= 0)
+                return _initHookVTable(vtable, vtableIndex);
+
             return _initHook(targetFunction);
         }
 
@@ -281,6 +288,9 @@ public static class ClientConVarResponseReader
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private delegate int InitHookDelegate(IntPtr targetFunction);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int InitHookVTableDelegate(IntPtr vtable, int vtableIndex);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.I1)]

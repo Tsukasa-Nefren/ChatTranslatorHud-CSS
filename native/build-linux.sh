@@ -21,9 +21,12 @@ select_existing_path() {
     exit 1
 }
 
-PROTO_INC=$(select_existing_path "ModSharp generated protobuf include directory" \
-    "$ROOT_DIR/../../modsharp-public-master/Engine/src/proto" \
+HL2SDK_INC=$(select_existing_path "CounterStrikeSharp hl2sdk-cs2 public include directory" \
+    "$ROOT_DIR/../CounterStrikeSharp/libraries/hl2sdk-cs2/public" \
+    "$ROOT_DIR/../../_tmp/CounterStrikeSharp/libraries/hl2sdk-cs2/public" \
 )
+
+HL2SDK_ROOT=$(dirname "$HL2SDK_INC")
 
 PROTOBUF_INC=$(select_existing_path "protobuf include directory" \
     "$ROOT_DIR/../CounterStrikeSharp/libraries/hl2sdk-cs2/thirdparty/protobuf-3.21.8/src" \
@@ -31,27 +34,48 @@ PROTOBUF_INC=$(select_existing_path "protobuf include directory" \
 )
 
 PROTOBUF_LIB=$(select_existing_path "protobuf library directory" \
+    "$ROOT_DIR/../CounterStrikeSharp/libraries/hl2sdk-cs2/lib/linux64/release" \
     "$ROOT_DIR/../CounterStrikeSharp/libraries/hl2sdk-cs2/lib/public/linux64" \
+    "$ROOT_DIR/../../_tmp/CounterStrikeSharp/libraries/hl2sdk-cs2/lib/linux64/release" \
     "$ROOT_DIR/../../_tmp/CounterStrikeSharp/libraries/hl2sdk-cs2/lib/public/linux64" \
     "$ROOT_DIR/../../modsharp-public-master/Engine/lib" \
-)
-
-DYNOHOOK_INC=$(select_existing_path "DynoHook include directory" \
-    "$ROOT_DIR/../CounterStrikeSharp/libraries/DynoHook/src" \
-    "$ROOT_DIR/../../_tmp/CounterStrikeSharp/libraries/DynoHook/src" \
 )
 
 CXX=${CXX:-g++}
 
 echo "Compiling ChatTranslatorHud.Native.so..."
 $CXX -O2 -shared -fPIC -std=c++20 \
-    -I"$PROTO_INC" \
+    -DMETA_IS_SOURCE2 \
+    -D_LINUX \
+    -DPOSIX \
+    -DLINUX \
+    -DGNUC \
+    -DCOMPILER_GCC \
+    -DPLATFORM_64BITS \
+    -D_FILE_OFFSET_BITS=64 \
+    -D_GLIBCXX_USE_CXX11_ABI=0 \
+    -Dstricmp=strcasecmp \
+    -D_stricmp=strcasecmp \
+    -Dstrnicmp=strncasecmp \
+    -D_strnicmp=strncasecmp \
+    -D_snprintf=snprintf \
+    -D_vsnprintf=vsnprintf \
+    -D_alloca=alloca \
+    -Dstrcmpi=strcasecmp \
+    -I"$HL2SDK_INC" \
+    -I"$HL2SDK_ROOT/common" \
+    -I"$HL2SDK_INC/tier0" \
+    -I"$HL2SDK_INC/tier1" \
+    -I"$HL2SDK_INC/engine" \
+    -I"$HL2SDK_INC/mathlib" \
+    -I"$HL2SDK_INC/entity2" \
+    -I"$HL2SDK_INC/schemasystem" \
     -I"$PROTOBUF_INC" \
-    -I"$DYNOHOOK_INC" \
     -L"$PROTOBUF_LIB" \
     -fvisibility=hidden \
-    "$ROOT_DIR/native/ChatTranslatorHud.Native.cpp" \
+    "$ROOT_DIR/native/ChatTranslatorHud.Native.Linux.cpp" \
     -o "$OUT_DIR/ChatTranslatorHud.Native.so" \
-    -lprotobuf
+    -lprotobuf \
+    -pthread
 
 echo "Build complete: $OUT_DIR/ChatTranslatorHud.Native.so"

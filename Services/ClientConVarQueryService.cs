@@ -252,18 +252,18 @@ internal sealed class ClientConVarQueryService
             if (vtable == IntPtr.Zero)
                 throw new InvalidOperationException("Failed to find CServerSideClient vtable.");
 
-            IntPtr targetFunc = Marshal.ReadIntPtr(vtable + (vtableIndex * 8));
+            IntPtr targetFunc = Marshal.ReadIntPtr(vtable + (vtableIndex * IntPtr.Size));
             if (targetFunc == IntPtr.Zero)
                 throw new InvalidOperationException("Failed to read ProcessRespondCvarValue function pointer from vtable.");
 
-            int initResult = ClientConVarResponseReader.InitHook(targetFunc);
-            if (initResult != 0 && initResult != -2) // -2 is ALREADY_INITIALIZED, which is fine on reload
-                throw new InvalidOperationException($"ChatTranslatorHud.Native InitHook returned {initResult}. (MinHook failed)");
+            int initResult = ClientConVarResponseReader.InitHook(targetFunc, vtable, vtableIndex);
+            if (initResult != 0)
+                throw new InvalidOperationException($"ChatTranslatorHud.Native InitHook returned {initResult}.");
 
             _pollTimer = _plugin.AddTimer(0.1f, PollNativeQueue, TimerFlags.REPEAT);
             _nativeResponseHookRegistered = true;
 
-            _logger.LogInformation("Registered client convar native MinHook for CServerSideClient::CLCMsg_RespondCvarValue at vtable index {VtableIndex} in {EnginePath} (Pointer: {Ptr})", vtableIndex, Addresses.EnginePath, targetFunc.ToString("X"));
+            _logger.LogInformation("Registered client convar native hook for CServerSideClient::CLCMsg_RespondCvarValue at vtable index {VtableIndex} in {EnginePath} (Pointer: {Ptr})", vtableIndex, Addresses.EnginePath, targetFunc.ToString("X"));
             return true;
         }
         catch (Exception ex)
